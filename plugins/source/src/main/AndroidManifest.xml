@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="app.aaps.plugins.source">
+
+    <!-- 查询 xDrip 包（用于 bindService） -->
+    <queries>
+        <package android:name="com.eveningoutpost.dexdrip" />
+    </queries>
+
+    <application>
+        <!-- AIDL 服务：供 xDrip 绑定 -->
+        <service
+            android:name=".xDripAidl.XdripAidlService"
+            android:enabled="true"
+            android:exported="true" />
+
+        <activity
+            android:name=".activities.RequestDexcomPermissionActivity"
+            android:exported="false" />
+
+    </application>
+
+</manifest>
