@@ -2,7 +2,8 @@ package app.aaps
 
 import android.os.Handler
 import android.os.Looper
-import app.aaps.utils.BatteryOptimizationUtil
+//import app.aaps.utils.BatteryOptimizationUtil
+import app.aaps.utils.BatteryWhitelistEnforcer
 
 import android.content.Context
 import android.content.Intent
@@ -115,29 +116,34 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
     private var menuOpen = false
     private var isProtectionCheckActive = false
     private lateinit var binding: ActivityMainBinding
+    private var mainMenuProvider: MenuProvider? = null
 
-    companion object {
-    private const val REQUEST_CODE_BATTERY_OPTIMIZATION = 1001 // 必须与工具类中的请求码一致
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-    super.onActivityResult(requestCode, resultCode, data)
+/*
+////////////////////////////////////////////
     
-    if (requestCode == REQUEST_CODE_BATTERY_OPTIMIZATION) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val hasPermission = BatteryOptimizationUtil.isIgnoringBatteryOptimizations(this)
-            val feedback = if (hasPermission) {
-                R.string.battery_permission_granted_thanks
-            } else {
-                R.string.battery_permission_warning
-            }
-            runOnUiThread {
-                Toast.makeText(this, getString(feedback), Toast.LENGTH_LONG).show()
+    companion object {
+        private const val REQUEST_CODE_BATTERY_OPTIMIZATION = 1001 // 必须与工具类中的请求码一致
+    }    
+
+        override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+    
+        if (requestCode == REQUEST_CODE_BATTERY_OPTIMIZATION) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val hasPermission = BatteryOptimizationUtil.isIgnoringBatteryOptimizations(this)
+                val feedback = if (hasPermission) {
+                    R.string.battery_permission_granted_thanks
+                } else {
+                    R.string.battery_permission_warning
+                }
+                runOnUiThread {
+                    Toast.makeText(this, getString(feedback), Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
-}
-    
+////////////////////////////////////////////
+*/    
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -154,17 +160,38 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
             it.syncState()
         }
 
+// ================================================
+        // 极简白名单调用 - 只需这一行代码！        
+        //BatteryWhitelistEnforcer.forceWhitelisting(this);        
+        // 或者使用更简单的版本（一行代码）：
+        // BatteryWhitelistEnforcer.simpleForce(this);
+
+        // ================================================
+        // 优化白名单调用 - 智能处理弹窗
+        // ================================================
+        // 方法1：智能调用（推荐）
+        BatteryWhitelistEnforcer.smartCall(this)        
+        // 或者方法2：检查并通知（如果需要）
+        // BatteryWhitelistEnforcer.checkAndNotify(this)
+        
+// ================================================        
+
+/*
+////////////////////////////////////////////
 
         Handler(Looper.getMainLooper()).postDelayed({
-        // 传递字符串，而非资源ID，彻底避免R引用问题
-        BatteryOptimizationUtil.checkAndRequestIfNeeded(
-            this,
-            getString(R.string.please_allow_permission), // 这里在Activity中获取字符串是安全的
-            getString(R.string.aaps_needs_whitelisting_for_proper_performance),
-            getString(R.string.go_to_settings),
-            getString(R.string.later)
-        )
-    }, 1500)
+            // 传递字符串，而非资源ID，彻底避免R引用问题
+            BatteryOptimizationUtil.checkAndRequestIfNeeded(
+                this,
+                getString(R.string.please_allow_permission), // 这里在Activity中获取字符串是安全的
+                getString(R.string.aaps_needs_whitelisting_for_proper_performance),
+                getString(R.string.go_to_settings),
+                getString(R.string.later)
+            )
+        }, 1500)
+
+////////////////////////////////////////////
+*/
         
         // initialize screen wake lock
         processPreferenceChange(EventPreferenceChange(BooleanKey.OverviewKeepScreenOn.key))
@@ -381,6 +408,9 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
 
     override fun onDestroy() {
         super.onDestroy()
+        binding.mainPager.adapter = null
+        binding.mainDrawerLayout.removeDrawerListener(actionBarDrawerToggle)
+        mainMenuProvider?.let { removeMenuProvider(it) }
         disposable.clear()
     }
 
@@ -394,7 +424,73 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
                                             UIRunnable { OKDialog.show(this, "", rh.gs(R.string.authorizationfailed), true) { isProtectionCheckActive = false; finish() } }
             )
         }
+
+        // 当Activity回到前台时，检查白名单状态
+        // 可以显示一个温和的提示（如果不在白名单中）
+        checkWhitelistOnResume()
+        
     }
+
+    // ================================================ 
+        /**
+         * 在onResume中检查白名单状态
+         */
+        private fun checkWhitelistOnResume() {
+            // 只在特定条件下检查（比如第一次启动或每24小时）
+            val shouldCheck = shouldCheckWhitelist()
+        
+            if (shouldCheck) {
+                val inWhitelist = BatteryWhitelistEnforcer.silentCheck(this)
+            
+                if (!inWhitelist) {
+                    // 显示一个温和的提示（非弹窗）
+                    showWhitelistReminder()
+                }
+            
+                // 记录检查时间
+                recordWhitelistCheck()
+            }
+        }    
+    
+        /**
+         * 判断是否应该检查白名单
+         */
+        private fun shouldCheckWhitelist(): Boolean {
+            val prefs = getSharedPreferences("aaps_prefs", MODE_PRIVATE)
+            val lastCheck = prefs.getLong("last_whitelist_check", 0)
+            val currentTime = System.currentTimeMillis()
+        
+            // 每24小时检查一次
+            return currentTime - lastCheck > 24 * 60 * 60 * 1000
+        }
+    
+        /**
+         * 记录检查时间
+         */
+        private fun recordWhitelistCheck() {
+            getSharedPreferences("aaps_prefs", MODE_PRIVATE)
+                .edit()
+                .putLong("last_whitelist_check", System.currentTimeMillis())
+                .apply()
+        }
+    
+        /**
+         * 显示白名单提醒（非弹窗方式）
+         */
+        private fun showWhitelistReminder() {
+            // 可以在界面上显示一个提示条或小图标
+            // 这里使用Snackbar作为示例（需要material design库）
+            /*
+            Snackbar.make(
+                findViewById(android.R.id.content),
+                "请设置电池优化以保证后台运行",
+                Snackbar.LENGTH_LONG
+            ).setAction("设置") {
+                BatteryWhitelistEnforcer.smartCall(this)
+            }.show()
+            */
+        }    
+    // ================================================ 
 
     private fun setWakeLock() {
         val keepScreenOn = preferences.get(BooleanKey.OverviewKeepScreenOn)
