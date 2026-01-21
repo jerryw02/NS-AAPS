@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- ========== 基础权限 ========== -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -15,18 +14,27 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="com.dexcom.cgm.EXTERNAL_PERMISSION" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
+    <!-- ========== xDrip AIDL 绑定权限 ========== -->
+    <!-- 如果 xDrip 使用了自定义权限 -->
+    <uses-permission android:name="com.eveningoutpost.dexdrip.permission.BIND_BG_DATA_SERVICE" />
+    <!-- 标准绑定服务权限 -->
+    <uses-permission android:name="android.permission.BIND_JOB_SERVICE" />
+    <uses-permission android:name="android.permission.BIND_AUTO_CREATE" />
+    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
+    <uses-permission android:name="android.permission.BIND_TREATMENT_SERVICE" />
+
+    <!-- Android 6.0+ 权限 -->
     <uses-permission-sdk-23 android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- ========== 接收数据权限 ========== -->
     <!-- To receive data from xdrip. -->
     <uses-permission android:name="com.eveningoutpost.dexdrip.permissions.RECEIVE_BG_ESTIMATE" />
-
     <!-- To receive data from Aidex -->
     <uses-permission android:name="com.microtechmd.cgms.aidex.permissions.RECEIVE_BG_ESTIMATE" />
 
@@ -41,6 +49,7 @@
         android:roundIcon="${appIconRound}"
         android:supportsRtl="true"
         android:theme="@style/AppTheme.Launcher">
+        <profileable android:shell="true" />
 
         <meta-data
             android:name="com.google.android.gms.version"
@@ -73,6 +82,7 @@
             android:name="app.aaps.activities.HistoryBrowseActivity"
             android:exported="false"
             android:theme="@style/AppTheme" />
+        
         <!-- Receive new BG readings from other local apps -->
         <receiver
             android:name="app.aaps.receivers.DataReceiver"
@@ -81,6 +91,9 @@
             <intent-filter>
                 <!-- Receiver from xDrip -->
                 <action android:name="com.eveningoutpost.dexdrip.BgEstimate" />
+                <!-- 添加 AIDL 可能使用的广播 -->
+                <action android:name="com.eveningoutpost.dexdrip.BgDataService" />
+                <action android:name="com.eveningoutpost.dexdrip.AIDL_BG_DATA" />
                 <!-- Receiver from 640g uploader -->
                 <action android:name="com.eveningoutpost.dexdrip.NS_EMULATOR" />
                 <!-- Receiver from glimp -->
@@ -94,7 +107,11 @@
                 <action android:name="com.fanqies.tomatofn.BgEstimate" />
                 <!-- Receiver from GlucoRx Aidex -->
                 <action android:name="com.microtechmd.cgms.aidex.action.BgEstimate" />
-                <!-- Receiver from patched Ottai app -->
+                <!-- Receiver from patched Ottai app (International) -->
+                <action android:name="info.nightscout.androidaps.action.OTTAI_APP" />
+                <!-- Receiver from patched Syai Tag app -->
+                <action android:name="info.nightscout.androidaps.action.SYAI_TAG_APP" />
+                <!-- Receiver from patched Ottai app (China) -->
                 <action android:name="cn.diyaps.sharing.OT_APP" />
                 <!-- Receiver from patched SI app -->
                 <action android:name="cn.diyaps.sharing.SI_APP" />
@@ -141,13 +158,6 @@
             android:name="org.apache.http.legacy"
             android:required="false" />
 
-    </application>
-
-    <application>
-        <service
-            android:name="app.aaps.plugins.sources.xDripAidl.XDripAidlService"
-            android:enabled="true"
-            android:exported="false" />
     </application>
 
 </manifest>
